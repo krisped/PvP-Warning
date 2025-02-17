@@ -39,19 +39,6 @@ public class PriceManager {
     private static Map<Integer, Long> osrsWikiPrices;
     private static long osrsWikiPricesLastFetch = 0;
 
-    // Cache for GE Official-priser (gyldig i 5 min)
-    private static final long GE_OFFICIAL_CACHE_DURATION = 300000;
-    private static Map<Integer, PriceCacheEntry> geOfficialPrices = new HashMap<>();
-
-    private static class PriceCacheEntry {
-        long price;
-        long timestamp;
-        PriceCacheEntry(long price, long timestamp) {
-            this.price = price;
-            this.timestamp = timestamp;
-        }
-    }
-
     // Henter prisen for et item basert på konfigurasjonen
     public static long getPriceForItem(int itemId, ItemManager itemManager, PvPWarningConfig config) {
         if (MANUAL_PRICES.containsKey(itemId))
@@ -60,8 +47,6 @@ public class PriceManager {
             return itemManager.getItemPrice(itemId);
         else if (config.priceSource() == PvPWarningConfig.PriceSource.OSRS_WIKI)
             return getOsrsWikiPrice(itemId);
-        else if (config.priceSource() == PvPWarningConfig.PriceSource.OSRS_GE_OFFICIAL)
-            return getGeOfficialPrice(itemId);
         return 0L;
     }
 
@@ -106,62 +91,6 @@ public class PriceManager {
         return prices;
     }
 
-    private static long getGeOfficialPrice(int itemId) {
-        long now = System.currentTimeMillis();
-        PriceCacheEntry entry = geOfficialPrices.get(itemId);
-        if (entry != null && (now - entry.timestamp) < GE_OFFICIAL_CACHE_DURATION) {
-            return entry.price;
-        }
-        long price = fetchGeOfficialPrice(itemId);
-        geOfficialPrices.put(itemId, new PriceCacheEntry(price, now));
-        return price;
-    }
-
-    private static long fetchGeOfficialPrice(int itemId) {
-        try {
-            URL url = new URL("https://services.runelite.com/m:itemdb_oldschool/api/catalogue/detail.json?item=" + itemId);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-            connection.setRequestMethod("GET");
-            // Øk timeout-verdiene til 5000 ms
-            connection.setConnectTimeout(5000);
-            connection.setReadTimeout(5000);
-            if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
-                InputStream is = connection.getInputStream();
-                Reader reader = new InputStreamReader(is);
-                Gson gson = new Gson();
-                GeOfficialResponse response = gson.fromJson(reader, GeOfficialResponse.class);
-                reader.close();
-                if (response != null && response.item != null && response.item.current != null) {
-                    String priceStr = response.item.current.price.replace(",", "").trim();
-                    if (!priceStr.isEmpty()) {
-                        return parsePrice(priceStr);
-                    }
-                }
-            }
-        } catch (java.net.SocketTimeoutException e) {
-            System.err.println("GE Official API timeout for item " + itemId);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return 0L;
-    }
-
-    private static long parsePrice(String priceStr) throws NumberFormatException {
-        priceStr = priceStr.toLowerCase();
-        if (priceStr.endsWith("k")) {
-            double value = Double.parseDouble(priceStr.substring(0, priceStr.length() - 1));
-            return (long)(value * 1000);
-        } else if (priceStr.endsWith("m")) {
-            double value = Double.parseDouble(priceStr.substring(0, priceStr.length() - 1));
-            return (long)(value * 1000000);
-        } else if (priceStr.endsWith("b")) {
-            double value = Double.parseDouble(priceStr.substring(0, priceStr.length() - 1));
-            return (long)(value * 1000000000);
-        } else {
-            return Long.parseLong(priceStr);
-        }
-    }
-
     private static class OSRSWikiResponse {
         Map<String, OSRSItemPrice> data;
     }
@@ -173,19 +102,6 @@ public class PriceManager {
         long sell_average;
         long high;
         long low;
-    }
-
-    private static class GeOfficialResponse {
-        GeOfficialItem item;
-    }
-    private static class GeOfficialItem {
-        int id;
-        String name;
-        GeOfficialCurrent current;
-    }
-    private static class GeOfficialCurrent {
-        String trend;
-        String price;
     }
 
     // Beregner total risk basert på items, PvP-skull og Protect Item
