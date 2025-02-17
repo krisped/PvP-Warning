@@ -18,6 +18,26 @@ public interface PvPWarningConfig extends Config
     }
 
     @ConfigItem(
+            keyName = "riskOverlayType",
+            name = "Risk Overlay Type",
+            description = "Velg om risk vises som en Overlay Box (flyttbar) eller som Inventory Overlay (fast tekst)"
+    )
+    default RiskOverlayType riskOverlayType()
+    {
+        return RiskOverlayType.OVERLAY_BOX;
+    }
+
+    @ConfigItem(
+            keyName = "inventoryOverlayPosition",
+            name = "Inventory Overlay Position",
+            description = "Velg om risk-teksten skal vises øverst eller nederst i inventory (gjelder kun Inventory Overlay)"
+    )
+    default InventoryOverlayPosition inventoryOverlayPosition()
+    {
+        return InventoryOverlayPosition.TOP;
+    }
+
+    @ConfigItem(
             keyName = "priceSource",
             name = "Get prices from:",
             description = "Velg kilde for item priser"
@@ -30,7 +50,7 @@ public interface PvPWarningConfig extends Config
     @ConfigItem(
             keyName = "protectItem",
             name = "Protect Item",
-            description = "Når aktiv, trekk fra ekstra verdi (totalt 4 dyreste items) dersom Protect Item prayer er aktiv. Hvis ikke aktiv, trekk fra 3 dyreste items i skull-modus."
+            description = "Når aktiv, trekk fra ekstra verdi (i skull-modus: trekk fra 3 eller 4 dyreste items avhengig av Protect Item Prayer)."
     )
     default boolean protectItem()
     {
@@ -40,10 +60,22 @@ public interface PvPWarningConfig extends Config
     @ConfigItem(
             keyName = "riskBasedOnPvPSkull",
             name = "Risk based on PvP Skull",
-            description = "Hvis aktiv: Hvis skulled, vis full risk. Hvis ikke skulled, trekk fra de 3 dyreste items (4 hvis Protect Item er aktiv og Protect Item Prayer er aktiv)."
+            description = "Hvis aktiv: Hvis skulled, vis full risk (med unntak: trekk fra den dyreste itemen dersom Protect Item Prayer er aktiv). Hvis ikke skulled, trekk fra de 3 dyreste items (4 hvis Protect Item og Protect Item Prayer er aktiv)."
     )
     default boolean riskBasedOnPvPSkull()
     {
         return true;
+    }
+
+    enum RiskOverlayType
+    {
+        OVERLAY_BOX,
+        INVENTORY_OVERLAY
+    }
+
+    enum InventoryOverlayPosition
+    {
+        TOP,
+        BOTTOM
     }
 }

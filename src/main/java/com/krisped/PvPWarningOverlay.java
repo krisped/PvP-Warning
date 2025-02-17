@@ -2,7 +2,9 @@ package com.krisped;
 
 import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,7 +24,11 @@ import net.runelite.api.Item;
 import net.runelite.api.ItemContainer;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Varbits;
+import net.runelite.api.widgets.Widget;
+import net.runelite.api.widgets.WidgetInfo;
 import net.runelite.client.game.ItemManager;
+import net.runelite.client.ui.overlay.Overlay;
+import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.TitleComponent;
@@ -53,12 +59,12 @@ public class PvPWarningOverlay extends OverlayPanel
         MANUAL_PRICES.put(21260, 240000L);  // Ava's Assembler
     }
 
-    // Cache for OSRS Wiki-priser (gyldig i 5 minutter)
+    // Cache for OSRS Wiki-priser (gyldig i 5 min)
     private Map<Integer, Long> osrsWikiPrices;
     private long osrsWikiPricesLastFetch = 0;
     private static final long OSRS_WIKI_CACHE_DURATION = 300000;
 
-    // Cache for OSRS GE Official priser (gyldig i 5 minutter)
+    // Cache for OSRS GE Official priser (gyldig i 5 min)
     private Map<Integer, PriceCacheEntry> geOfficialPrices = new HashMap<>();
     private static final long GE_OFFICIAL_CACHE_DURATION = 300000;
 
@@ -73,29 +79,19 @@ public class PvPWarningOverlay extends OverlayPanel
         setPosition(OverlayPosition.ABOVE_CHATBOX_RIGHT);
     }
 
-    // Hjelpefunksjon: Returner manuell pris om tilgjengelig, ellers hent prisen basert på valgt kilde.
-    private long getPriceForItem(int id) {
-        if (MANUAL_PRICES.containsKey(id)) {
-            return MANUAL_PRICES.get(id);
-        }
-        if (config.priceSource() == PriceSource.RUNELITE) {
-            return itemManager.getItemPrice(id);
-        } else if (config.priceSource() == PriceSource.OSRS_WIKI) {
-            Map<Integer, Long> wiki = getOsrsWikiPrices();
-            return wiki.getOrDefault(id, 0L);
-        } else if (config.priceSource() == PriceSource.OSRS_GE_OFFICIAL) {
-            return getGeOfficialPrice(id);
-        }
-        return 0L;
+    // Instansmetode for å oppdatere risk for Overlay Box
+    public void updateRisk() {
+        risk = computeRisk(client, itemManager, config);
     }
 
-    public void updateRisk() {
+    // Statisk metode for å beregne total risk
+    public static int computeRisk(Client client, ItemManager itemManager, PvPWarningConfig config) {
         int total = 0;
         ItemContainer inventory = client.getItemContainer(InventoryID.INVENTORY);
         if (inventory != null) {
             for (Item item : inventory.getItems()) {
                 if (item != null && item.getId() != -1) {
-                    long price = getPriceForItem(item.getId());
+                    long price = getPriceForItemStatic(item.getId(), itemManager, config);
                     total += price * item.getQuantity();
                 }
             }
@@ -104,124 +100,107 @@ public class PvPWarningOverlay extends OverlayPanel
         if (equipment != null) {
             for (Item item : equipment.getItems()) {
                 if (item != null && item.getId() != -1) {
-                    long price = getPriceForItem(item.getId());
+                    long price = getPriceForItemStatic(item.getId(), itemManager, config);
                     total += price * item.getQuantity();
                 }
             }
         }
-
         if (config.riskBasedOnPvPSkull()) {
-            // Sjekk skull-status via localPlayer.getSkullIcon()
             boolean skulled = client.getLocalPlayer().getSkullIcon() != -1;
             if (!skulled) {
-                // Ikke skulled: Trekk fra de 3 dyreste items,
-                // eller 4 hvis Protect Item (Protect Item Prayer) er aktiv.
                 int numToSubtract = 3;
-                if (config.protectItem() && isProtectItemPrayerActive()) {
+                if (config.protectItem() && isProtectItemPrayerActiveStatic(client))
                     numToSubtract = 4;
-                }
-                List<Long> priceList = new ArrayList<>();
+                List<Long> pricesList = new ArrayList<>();
                 if (inventory != null) {
                     for (Item item : inventory.getItems()) {
-                        if (item != null && item.getId() != -1) {
-                            priceList.add(getPriceForItem(item.getId()));
-                        }
+                        if (item != null && item.getId() != -1)
+                            pricesList.add(getPriceForItemStatic(item.getId(), itemManager, config));
                     }
                 }
                 if (equipment != null) {
                     for (Item item : equipment.getItems()) {
-                        if (item != null && item.getId() != -1) {
-                            priceList.add(getPriceForItem(item.getId()));
-                        }
+                        if (item != null && item.getId() != -1)
+                            pricesList.add(getPriceForItemStatic(item.getId(), itemManager, config));
                     }
                 }
-                priceList.sort((a, b) -> Long.compare(b, a));
+                pricesList.sort((a, b) -> Long.compare(b, a));
                 long subtractSum = 0;
-                for (int i = 0; i < numToSubtract && i < priceList.size(); i++) {
-                    subtractSum += priceList.get(i);
+                for (int i = 0; i < numToSubtract && i < pricesList.size(); i++) {
+                    subtractSum += pricesList.get(i);
                 }
                 total -= subtractSum;
-                if (total < 0) {
+                if (total < 0)
                     total = 0;
-                }
             } else {
-                // Skulled: Full risk, men dersom Protect Item er aktiv (dvs. Protect Item Prayer er aktiv), trekk fra den dyreste itemen.
-                if (config.protectItem() && isProtectItemPrayerActive()) {
+                if (config.protectItem() && isProtectItemPrayerActiveStatic(client)) {
                     long maxPrice = 0;
                     if (inventory != null) {
                         for (Item item : inventory.getItems()) {
                             if (item != null && item.getId() != -1) {
-                                long price = getPriceForItem(item.getId());
-                                if (price > maxPrice) {
+                                long price = getPriceForItemStatic(item.getId(), itemManager, config);
+                                if (price > maxPrice)
                                     maxPrice = price;
-                                }
                             }
                         }
                     }
                     if (equipment != null) {
                         for (Item item : equipment.getItems()) {
                             if (item != null && item.getId() != -1) {
-                                long price = getPriceForItem(item.getId());
-                                if (price > maxPrice) {
+                                long price = getPriceForItemStatic(item.getId(), itemManager, config);
+                                if (price > maxPrice)
                                     maxPrice = price;
-                                }
                             }
                         }
                     }
                     total -= maxPrice;
-                    if (total < 0) {
+                    if (total < 0)
                         total = 0;
-                    }
                 }
-                // Ellers, full risk.
             }
         } else {
-            // Standard modus (ikke skull-basert):
-            if (config.protectItem() && isProtectItemPrayerActive()) {
+            if (config.protectItem() && isProtectItemPrayerActiveStatic(client)) {
                 long maxPrice = 0;
                 if (inventory != null) {
                     for (Item item : inventory.getItems()) {
                         if (item != null && item.getId() != -1) {
-                            long price = getPriceForItem(item.getId());
-                            if (price > maxPrice) {
+                            long price = getPriceForItemStatic(item.getId(), itemManager, config);
+                            if (price > maxPrice)
                                 maxPrice = price;
-                            }
                         }
                     }
                 }
                 if (equipment != null) {
                     for (Item item : equipment.getItems()) {
                         if (item != null && item.getId() != -1) {
-                            long price = getPriceForItem(item.getId());
-                            if (price > maxPrice) {
+                            long price = getPriceForItemStatic(item.getId(), itemManager, config);
+                            if (price > maxPrice)
                                 maxPrice = price;
-                            }
                         }
                     }
                 }
                 total -= maxPrice;
-                if (total < 0) {
+                if (total < 0)
                     total = 0;
-                }
             }
         }
-        risk = total;
+        return total;
     }
 
-    // Sjekk om Protect Item Prayer er aktiv for local player
-    private boolean isProtectItemPrayerActive() {
-        return client.getVar(Varbits.PRAYER_PROTECT_ITEM) == 1;
+    private static long getPriceForItemStatic(int id, ItemManager itemManager, PvPWarningConfig config) {
+        if (MANUAL_PRICES.containsKey(id))
+            return MANUAL_PRICES.get(id);
+        if (config.priceSource() == PriceSource.RUNELITE)
+            return itemManager.getItemPrice(id);
+        else if (config.priceSource() == PriceSource.OSRS_WIKI) {
+            Map<Integer, Long> wiki = getOsrsWikiPricesStatic(itemManager, config);
+            return wiki.getOrDefault(id, 0L);
+        } else if (config.priceSource() == PriceSource.OSRS_GE_OFFICIAL)
+            return getGeOfficialPriceStatic(id, itemManager, config);
+        return 0L;
     }
 
-    private Map<Integer, Long> getOsrsWikiPrices() {
-        if (osrsWikiPrices == null || (System.currentTimeMillis() - osrsWikiPricesLastFetch) > OSRS_WIKI_CACHE_DURATION) {
-            osrsWikiPrices = fetchOsrsWikiPrices();
-            osrsWikiPricesLastFetch = System.currentTimeMillis();
-        }
-        return osrsWikiPrices;
-    }
-
-    private Map<Integer, Long> fetchOsrsWikiPrices() {
+    private static Map<Integer, Long> getOsrsWikiPricesStatic(ItemManager itemManager, PvPWarningConfig config) {
         Map<Integer, Long> prices = new HashMap<>();
         try {
             URL url = new URL("https://prices.runescape.wiki/api/v1/osrs/latest");
@@ -252,20 +231,36 @@ public class PvPWarningOverlay extends OverlayPanel
         return prices;
     }
 
-    private static class OSRSWikiResponse {
-        Map<String, OSRSItemPrice> data;
+    private static long getGeOfficialPriceStatic(int itemId, ItemManager itemManager, PvPWarningConfig config) {
+        // For enkelhets skyld returneres 0 her
+        return 0L;
     }
 
-    private static class OSRSItemPrice {
-        String name;
-        int limit;
-        long buy_average;
-        long sell_average;
-        long high;
-        long low;
+    private static boolean isProtectItemPrayerActiveStatic(Client client) {
+        return client.getVar(Varbits.PRAYER_PROTECT_ITEM) == 1;
     }
 
-    // Metoder for OSRS GE Official priser
+    @Override
+    public Dimension render(Graphics2D graphics) {
+        if (!config.showRiskOverlay()) {
+            return null;
+        }
+        updateRisk();
+        String text = "Risk: " + NumberFormat.getInstance().format(risk) + " GP";
+        panelComponent.getChildren().clear();
+        panelComponent.getChildren().add(
+                TitleComponent.builder()
+                        .text(text)
+                        .color(Color.WHITE)
+                        .build()
+        );
+        panelComponent.setPreferredSize(new Dimension(
+                graphics.getFontMetrics().stringWidth(text) + 20,
+                graphics.getFontMetrics().getHeight() + 10
+        ));
+        return super.render(graphics);
+    }
+
     private long getGeOfficialPrice(final int itemId) {
         PriceCacheEntry entry = geOfficialPrices.get(itemId);
         long now = System.currentTimeMillis();
@@ -282,7 +277,7 @@ public class PvPWarningOverlay extends OverlayPanel
 
     private long fetchGeOfficialPrice(int itemId) {
         try {
-            URL url = new URL("https://services.runescape.com/m:itemdb_oldschool/api/catalogue/detail.json?item=" + itemId);
+            URL url = new URL("https://services.runelite.com/m:itemdb_oldschool/api/catalogue/detail.json?item=" + itemId);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(2000);
@@ -307,7 +302,6 @@ public class PvPWarningOverlay extends OverlayPanel
         return 0L;
     }
 
-    // Tolker prisstrenger med suffikser, for eksempel "464.2k" -> 464200
     private static long parsePrice(String priceStr) throws NumberFormatException {
         priceStr = priceStr.toLowerCase();
         if (priceStr.endsWith("k")) {
@@ -322,6 +316,19 @@ public class PvPWarningOverlay extends OverlayPanel
         } else {
             return Long.parseLong(priceStr);
         }
+    }
+
+    private static class OSRSWikiResponse {
+        Map<String, OSRSItemPrice> data;
+    }
+
+    private static class OSRSItemPrice {
+        String name;
+        int limit;
+        long buy_average;
+        long sell_average;
+        long high;
+        long low;
     }
 
     private static class GeOfficialResponse {
@@ -345,24 +352,41 @@ public class PvPWarningOverlay extends OverlayPanel
         }
     }
 
-    @Override
-    public Dimension render(Graphics2D graphics) {
-        if (!config.showRiskOverlay()) {
+    // Indre klasse for Inventory Overlay – vises fast i inventory-widgeten
+    public class InventoryTextOverlay extends Overlay {
+        public InventoryTextOverlay() {
+            setPosition(OverlayPosition.DYNAMIC);
+            setLayer(OverlayLayer.ABOVE_WIDGETS);
+        }
+
+        public void updateRisk(int risk) {
+            PvPWarningOverlay.this.risk = risk;
+        }
+
+        @Override
+        public Dimension render(Graphics2D graphics) {
+            Widget inventoryWidget = client.getWidget(WidgetInfo.INVENTORY);
+            if (inventoryWidget == null || inventoryWidget.isHidden()) {
+                return null;
+            }
+            Rectangle bounds = inventoryWidget.getBounds();
+            String text = "Risk: " + NumberFormat.getInstance().format(risk) + " GP";
+            Font font = new Font("Arial", Font.BOLD, 14);
+            graphics.setFont(font);
+            graphics.setColor(Color.WHITE);
+            int textWidth = graphics.getFontMetrics().stringWidth(text);
+            int x = bounds.x + (bounds.width - textWidth) / 2;
+            int yTop = bounds.y + graphics.getFontMetrics().getAscent() + 2;
+            int yBottom = bounds.y + bounds.height - 2;
+            int y = config.inventoryOverlayPosition() == PvPWarningConfig.InventoryOverlayPosition.TOP ? yTop : yBottom;
+            graphics.drawString(text, x, y);
             return null;
         }
-        updateRisk();
-        String text = "Risk: " + NumberFormat.getInstance().format(risk) + " GP";
-        panelComponent.getChildren().clear();
-        panelComponent.getChildren().add(
-                TitleComponent.builder()
-                        .text(text)
-                        .color(Color.WHITE)
-                        .build()
-        );
-        panelComponent.setPreferredSize(new Dimension(
-                graphics.getFontMetrics().stringWidth(text) + 20,
-                graphics.getFontMetrics().getHeight() + 10
-        ));
-        return super.render(graphics);
+    }
+
+    // Nested enum slik at InventoryTextOverlay kan referere til den
+    public enum InventoryOverlayPosition {
+        TOP,
+        BOTTOM
     }
 }

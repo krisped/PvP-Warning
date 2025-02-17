@@ -13,7 +13,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 
 @PluginDescriptor(
         name = "[KP] PvP Warnings",
-        description = "Viser et overlay med total risiko basert på local players inventory og equipment",
+        description = "Viser risk basert på items, PvP skull og Protect Item",
         tags = {"pvp", "warnings", "overlay"}
 )
 public class PvPWarningPlugin extends Plugin
@@ -30,27 +30,43 @@ public class PvPWarningPlugin extends Plugin
     @Inject
     private OverlayManager overlayManager;
 
-    private PvPWarningOverlay overlay;
+    private PvPWarningOverlay riskOverlay;
+    private PvPWarningOverlay.InventoryTextOverlay inventoryOverlay;
 
     @Override
     protected void startUp() throws Exception
     {
-        overlay = new PvPWarningOverlay(client, itemManager, config);
-        overlayManager.add(overlay);
+        if (config.riskOverlayType() == PvPWarningConfig.RiskOverlayType.OVERLAY_BOX) {
+            riskOverlay = new PvPWarningOverlay(client, itemManager, config);
+            overlayManager.add(riskOverlay);
+        } else {
+            PvPWarningOverlay temp = new PvPWarningOverlay(client, itemManager, config);
+            inventoryOverlay = temp.new InventoryTextOverlay();
+            overlayManager.add(inventoryOverlay);
+        }
     }
 
     @Override
     protected void shutDown() throws Exception
     {
-        overlayManager.remove(overlay);
+        if (riskOverlay != null)
+            overlayManager.remove(riskOverlay);
+        if (inventoryOverlay != null)
+            overlayManager.remove(inventoryOverlay);
     }
 
     @Subscribe
     public void onGameTick(GameTick event)
     {
-        if (overlay != null)
-        {
-            overlay.updateRisk();
+        int computedRisk = PvPWarningOverlay.computeRisk(client, itemManager, config);
+        if (config.riskOverlayType() == PvPWarningConfig.RiskOverlayType.OVERLAY_BOX) {
+            if (riskOverlay != null) {
+                riskOverlay.updateRisk();
+            }
+        } else {
+            if (inventoryOverlay != null) {
+                inventoryOverlay.updateRisk(computedRisk);
+            }
         }
     }
 
