@@ -12,6 +12,7 @@ import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
 import com.krisped.overlay.ProtectItemOverlay;
+import com.krisped.overlay.RecoilOverlay;
 
 @PluginDescriptor(
         name = "[KP] PvP Warnings",
@@ -34,19 +35,21 @@ public class PvPWarningPlugin extends Plugin {
     private OnscreenOverlay onscreenOverlay;
     private InventoryOverlay inventoryOverlay;
     private ProtectItemOverlay protectItemOverlay;
+    private RecoilOverlay recoilOverlay;
 
     @Override
     protected void startUp() throws Exception {
-        // Legg til risk overlays
         onscreenOverlay = new OnscreenOverlay(client, itemManager, config);
         overlayManager.add(onscreenOverlay);
 
         inventoryOverlay = new InventoryOverlay(client, itemManager, config);
         overlayManager.add(inventoryOverlay);
 
-        // Legg til Protect Item Overlay (overlayet sjekker selv config for om det skal vises)
-        protectItemOverlay = new ProtectItemOverlay(spriteManager, config);
+        protectItemOverlay = new ProtectItemOverlay(spriteManager, config, client);
         overlayManager.add(protectItemOverlay);
+
+        recoilOverlay = new RecoilOverlay(itemManager, config, client);
+        overlayManager.add(recoilOverlay);
     }
 
     @Override
@@ -54,9 +57,11 @@ public class PvPWarningPlugin extends Plugin {
         overlayManager.remove(onscreenOverlay);
         overlayManager.remove(inventoryOverlay);
         overlayManager.remove(protectItemOverlay);
+        overlayManager.remove(recoilOverlay);
         onscreenOverlay = null;
         inventoryOverlay = null;
         protectItemOverlay = null;
+        recoilOverlay = null;
     }
 
     @Subscribe
@@ -67,6 +72,7 @@ public class PvPWarningPlugin extends Plugin {
         if (inventoryOverlay != null) {
             inventoryOverlay.updateRisk();
         }
+        // All logikk for Protect Item- og Recoil-overlays håndteres i sine respektive klasser
     }
 
     @Provides

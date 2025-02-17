@@ -82,21 +82,72 @@ public interface PvPWarningConfig extends Config
     }
 
     @ConfigSection(
-            name = "PvP Overlay Settings",
-            description = "Innstillinger for PvP overlay",
+            name = "Protect Item Settings",
+            description = "Innstillinger for Protect Item overlay og varsel",
             position = 1
     )
-    String pvpOverlaySettings = "pvpOverlaySettings";
+    String protectItemSettings = "protectItemSettings";
 
     @ConfigItem(
             keyName = "protectItemWarning",
             name = "Protect Item Warning",
             description = "Skru av og på Protect Item Overlay",
-            section = pvpOverlaySettings
+            section = protectItemSettings
     )
     default boolean protectItemWarning()
     {
         return true;
+    }
+
+    @ConfigItem(
+            keyName = "protectItemWarningChat",
+            name = "Protect Item Warning Chat",
+            description = "Send en melding i chat når Protect Item Prayer er deaktivert",
+            section = protectItemSettings
+    )
+    default boolean protectItemWarningChat()
+    {
+        return false;
+    }
+
+    @ConfigItem(
+            keyName = "protectItemWarningDelay",
+            name = "Warning Delay (TICKS)",
+            description = "Hvor ofte (i game ticks) skal varsel sendes når Protect Item er deaktivert",
+            section = protectItemSettings
+    )
+    default int protectItemWarningDelay()
+    {
+        return 20;
+    }
+
+    @ConfigSection(
+            name = "Recoil Settings",
+            description = "Innstillinger for Recoil overlay",
+            position = 2
+    )
+    String recoilSettings = "recoilSettings";
+
+    @ConfigItem(
+            keyName = "noRecoilOverlay",
+            name = "No Recoil Overlay",
+            description = "Vis overlay når du IKKE har ring of recoil utstyrt",
+            section = recoilSettings
+    )
+    default boolean noRecoilOverlay()
+    {
+        return true;
+    }
+
+    @ConfigItem(
+            keyName = "blinkRecoilOverlay",
+            name = "Blink Recoil Overlay",
+            description = "Blink recoil overlay (fjerner og viser ikonet annenhver tick, ca. hvert sekund)",
+            section = recoilSettings
+    )
+    default boolean blinkRecoilOverlay()
+    {
+        return false;
     }
 
     enum InventoryOverlayPosition
