@@ -10,7 +10,7 @@ public interface PvPWarningConfig extends Config
     @ConfigItem(
             keyName = "showRiskOverlay",
             name = "Show Risk Overlay",
-            description = "Skru av/på overlay som viser total risiko ved død"
+            description = "Vis onscreen overlay med total risk"
     )
     default boolean showRiskOverlay()
     {
@@ -18,19 +18,19 @@ public interface PvPWarningConfig extends Config
     }
 
     @ConfigItem(
-            keyName = "riskOverlayType",
-            name = "Risk Overlay Type",
-            description = "Velg om risk vises som en Overlay Box (flyttbar) eller som Inventory Overlay (fast tekst)"
+            keyName = "showInventoryRiskOverlay",
+            name = "Show Inventory Risk Overlay",
+            description = "Vis risk i inventory hvis aktivert"
     )
-    default RiskOverlayType riskOverlayType()
+    default boolean showInventoryRiskOverlay()
     {
-        return RiskOverlayType.OVERLAY_BOX;
+        return false;
     }
 
     @ConfigItem(
             keyName = "inventoryOverlayPosition",
             name = "Inventory Overlay Position",
-            description = "Velg om risk-teksten skal vises øverst eller nederst i inventory (gjelder kun Inventory Overlay)"
+            description = "Velg om risk-teksten skal vises øverst eller nederst i inventory (gjelder kun Inventory overlay)"
     )
     default InventoryOverlayPosition inventoryOverlayPosition()
     {
@@ -67,15 +67,16 @@ public interface PvPWarningConfig extends Config
         return true;
     }
 
-    enum RiskOverlayType
-    {
-        OVERLAY_BOX,
-        INVENTORY_OVERLAY
-    }
-
     enum InventoryOverlayPosition
     {
         TOP,
         BOTTOM
+    }
+
+    enum PriceSource
+    {
+        RUNELITE,
+        OSRS_WIKI,
+        OSRS_GE_OFFICIAL
     }
 }
