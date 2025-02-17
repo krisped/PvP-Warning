@@ -39,7 +39,7 @@ public class PriceManager {
     private static Map<Integer, Long> osrsWikiPrices;
     private static long osrsWikiPricesLastFetch = 0;
 
-    // Statisk cache for GE Official-priser (gyldig i 5 min)
+    // Cache for GE Official-priser (gyldig i 5 min)
     private static final long GE_OFFICIAL_CACHE_DURATION = 300000;
     private static Map<Integer, PriceCacheEntry> geOfficialPrices = new HashMap<>();
 
@@ -122,8 +122,9 @@ public class PriceManager {
             URL url = new URL("https://services.runelite.com/m:itemdb_oldschool/api/catalogue/detail.json?item=" + itemId);
             HttpURLConnection connection = (HttpURLConnection) url.openConnection();
             connection.setRequestMethod("GET");
-            connection.setConnectTimeout(2000);
-            connection.setReadTimeout(2000);
+            // Øk timeout-verdiene til 5000 ms
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(5000);
             if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
                 InputStream is = connection.getInputStream();
                 Reader reader = new InputStreamReader(is);
@@ -137,6 +138,8 @@ public class PriceManager {
                     }
                 }
             }
+        } catch (java.net.SocketTimeoutException e) {
+            System.err.println("GE Official API timeout for item " + itemId);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -202,7 +205,7 @@ public class PriceManager {
             }
         }
 
-        // Justering basert på Protect Item og PvP-skull
+        // Justering basert på PvP-skull og Protect Item
         if (config.riskBasedOnPvPSkull()) {
             boolean skulled = client.getLocalPlayer().getSkullIcon() != -1;
             if (!skulled) {

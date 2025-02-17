@@ -17,6 +17,9 @@ public class InventoryOverlay extends Overlay {
     private final PvPWarningConfig config;
     private int risk;
 
+    // Juster skriftstørrelsen her:
+    private static final float INVENTORY_FONT_SIZE = 15f;
+
     public InventoryOverlay(Client client, ItemManager itemManager, PvPWarningConfig config) {
         this.client = client;
         this.itemManager = itemManager;
@@ -41,16 +44,20 @@ public class InventoryOverlay extends Overlay {
 
         Rectangle bounds = inventoryWidget.getBounds();
         String text = "Risk: " + NumberFormat.getInstance().format(risk) + " GP";
-        Font font = FontManager.getRunescapeFont();
+
+        // Hent Runescape-fonten med en lokal definert størrelse
+        Font baseFont = FontManager.getRunescapeFont();
+        Font font = baseFont.deriveFont(INVENTORY_FONT_SIZE);
         graphics.setFont(font);
         graphics.setColor(Color.WHITE);
+
         int textWidth = graphics.getFontMetrics().stringWidth(text);
         int x = bounds.x + (bounds.width - textWidth) / 2;
 
-        // Beregn y-posisjon med justering: TOP opp og BOTTOM ned
-        int yTop = bounds.y + graphics.getFontMetrics().getAscent() + 2;
-        int yBottom = bounds.y + bounds.height - 2;
-        int offset = 3; // Juster offseten her etter ønske (3 piksler ca. et par mm)
+        // Beregn y-posisjon med justering: TOP flyttes opp og BOTTOM flyttes ned med offset
+        int yTop = bounds.y + graphics.getFontMetrics().getAscent();
+        int yBottom = bounds.y + bounds.height;
+        int offset = 3; // juster offset etter ønske
         int y = config.inventoryOverlayPosition() == PvPWarningConfig.InventoryOverlayPosition.TOP
                 ? yTop - offset
                 : yBottom + offset;
