@@ -1,7 +1,6 @@
 package com.krisped.overlay;
 
-import java.awt.Dimension;
-import java.awt.Graphics2D;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.util.Set;
 import net.runelite.api.Client;
@@ -20,17 +19,17 @@ public class ProtectItemOverlay extends Overlay
     private final PvPWarningConfig config;
     private final Client client;
 
-    // Sprite-ID for når Protect Item Prayer er aktiv og inaktiv
+    // Sprite-ID for Protect Item overlay (active/inactive)
     private final int spriteIdActive = 123;
     private final int spriteIdInactive = 143;
 
     private BufferedImage spriteImageActive;
     private BufferedImage spriteImageInactive;
 
-    // For å sende chat-melding med et definert intervall (i game ticks)
-    private int lastChatCycle = -1;
+    // For chat warning timing
+    private long lastChatTime = 0;
 
-    // Vi antar at varbit for wilderness-nivå er 29
+    // Assume wilderness level is stored in varbit 29
     private static final int WILDERNESS_LEVEL_VARBIT = 29;
 
     public ProtectItemOverlay(SpriteManager spriteManager, PvPWarningConfig config, Client client)
@@ -71,47 +70,38 @@ public class ProtectItemOverlay extends Overlay
     @Override
     public Dimension render(Graphics2D graphics)
     {
-        // Sjekk om overlayet skal vises via config
         if (!config.protectItemWarning())
         {
             return null;
         }
-
-        // Sjekk at spilleren er i en PvP-verden
         Set<WorldType> worldTypes = client.getWorldType();
-        if (!worldTypes.contains(WorldType.PVP))
+        if (!worldTypes.contains(WorldType.PVP) ||
+                client.getVar(WILDERNESS_LEVEL_VARBIT) <= 0 ||
+                client.getVar(Varbits.PVP_SPEC_ORB) == 0)
         {
             return null;
         }
-
-        // Sjekk at spilleren er i et unsafe område:
-        // - Wilderness-nivå (varbit 29) må være > 0
-        // - Spilleren må ikke være i safe zone – her bruker vi varbit PVP_SPEC_ORB:
-        //   Hvis client.getVar(Varbits.PVP_SPEC_ORB) == 0, tolkes det som safe.
-        if (client.getVar(WILDERNESS_LEVEL_VARBIT) <= 0 || client.getVar(Varbits.PVP_SPEC_ORB) == 0)
+        if (worldTypes.contains(WorldType.HIGH_RISK))
         {
             return null;
         }
-
         loadSprites();
-        // Sjekk om Protect Item Prayer er aktiv (1 betyr aktiv)
         boolean protectActive = client.getVar(Varbits.PRAYER_PROTECT_ITEM) == 1;
         BufferedImage spriteToShow = protectActive ? spriteImageActive : spriteImageInactive;
 
-        // Dersom chat-varsel er aktivert og Protect Item Prayer er deaktivert,
-        // send en melding med definert delay (i ticks)
         if (config.protectItemWarningChat() && !protectActive)
         {
-            int currentCycle = client.getGameCycle();
-            int delayTicks = config.protectItemWarningDelay(); // nå i ticks
-            if (currentCycle - lastChatCycle >= delayTicks)
+            long currentTime = System.currentTimeMillis();
+            int delayTicks = config.protectItemWarningDelay();
+            long delayMillis = delayTicks * 600L;
+            if (currentTime - lastChatTime >= delayMillis)
             {
-                // Sender melding med mørkere rød farge (<col=990000>)
-                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "System", "<col=990000>WARNING! Protect Item is DISABLED!!!", null);
-                lastChatCycle = currentCycle;
+                Color chatColor = config.protectItemWarningChatColor();
+                String hexColor = String.format("%06X", (0xFFFFFF & chatColor.getRGB()));
+                client.addChatMessage(ChatMessageType.GAMEMESSAGE, "System", "<col=" + hexColor + "><u>WARNING!</u> Protect Item prayer is DISABLED!", null);
+                lastChatTime = currentTime;
             }
         }
-
         if (spriteToShow != null)
         {
             graphics.drawImage(spriteToShow, 0, 0, null);

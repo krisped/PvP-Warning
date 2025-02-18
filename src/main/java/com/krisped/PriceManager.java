@@ -6,7 +6,6 @@ import net.runelite.api.Item;
 import net.runelite.api.InventoryID;
 import net.runelite.api.Varbits;
 import net.runelite.client.game.ItemManager;
-
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -15,9 +14,11 @@ import java.net.URL;
 import java.util.*;
 
 public class PriceManager {
-    // Manuelle priser for utvalgte items (itemId -> pris)
+    // Manual prices for selected items (itemId -> price)
     private static final Map<Integer, Long> MANUAL_PRICES = new HashMap<>();
     static {
+        // Include coins (id 995) with value 1 gp each.
+        MANUAL_PRICES.put(995, 1L);
         MANUAL_PRICES.put(6570, 150000L);   // Fire Cape
         MANUAL_PRICES.put(21275, 225000L);  // Infernal Cape
         MANUAL_PRICES.put(20072, 600000L);  // Avernic Defender
@@ -34,12 +35,12 @@ public class PriceManager {
         MANUAL_PRICES.put(21260, 240000L);  // Ava's Assembler
     }
 
-    // Cache for OSRS Wiki-priser (gyldig i 5 min)
+    // Cache for OSRS Wiki prices (valid for 5 minutes)
     private static final long OSRS_WIKI_CACHE_DURATION = 300000;
     private static Map<Integer, Long> osrsWikiPrices;
     private static long osrsWikiPricesLastFetch = 0;
 
-    // Henter prisen for et item basert på konfigurasjonen
+    // Get the price for an item based on the configuration
     public static long getPriceForItem(int itemId, ItemManager itemManager, PvPWarningConfig config) {
         if (MANUAL_PRICES.containsKey(itemId))
             return MANUAL_PRICES.get(itemId);
@@ -104,7 +105,7 @@ public class PriceManager {
         long low;
     }
 
-    // Beregner total risk basert på items, PvP-skull og Protect Item
+    // Compute total risk based on items, PvP skull, and Protect Item adjustments.
     public static int computeRisk(Client client, ItemManager itemManager, PvPWarningConfig config) {
         int total = 0;
         List<Item> allItems = new ArrayList<>();
@@ -121,7 +122,7 @@ public class PriceManager {
             }
         }
 
-        // Justering basert på PvP-skull og Protect Item
+        // Adjustment based on PvP skull and Protect Item
         if (config.riskBasedOnPvPSkull()) {
             boolean skulled = client.getLocalPlayer().getSkullIcon() != -1;
             if (!skulled) {

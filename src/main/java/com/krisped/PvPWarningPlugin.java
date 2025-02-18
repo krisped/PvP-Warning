@@ -16,7 +16,7 @@ import com.krisped.overlay.RecoilOverlay;
 
 @PluginDescriptor(
         name = "[KP] PvP Warnings",
-        description = "Viser risk basert på items, PvP skull og Protect Item",
+        description = "Displays risk based on items, PvP skull, and Protect Item settings.",
         tags = {"pvp", "warnings", "overlay"}
 )
 public class PvPWarningPlugin extends Plugin {
@@ -72,7 +72,7 @@ public class PvPWarningPlugin extends Plugin {
         if (inventoryOverlay != null) {
             inventoryOverlay.updateRisk();
         }
-        // All logikk for Protect Item- og Recoil-overlays håndteres i sine respektive klasser
+        // Logic for Protect Item and Recoil overlays is handled in their respective classes.
     }
 
     @Provides
