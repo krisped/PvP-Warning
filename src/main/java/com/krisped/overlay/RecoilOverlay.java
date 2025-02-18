@@ -1,6 +1,8 @@
 package com.krisped.overlay;
 
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.Set;
 import net.runelite.api.Client;
@@ -14,8 +16,7 @@ import net.runelite.client.ui.overlay.OverlayLayer;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import com.krisped.PvPWarningConfig;
 
-public class RecoilOverlay extends Overlay
-{
+public class RecoilOverlay extends Overlay {
     private final ItemManager itemManager;
     private final PvPWarningConfig config;
     private final Client client;
@@ -27,8 +28,7 @@ public class RecoilOverlay extends Overlay
     // For chat warning timing for no recoil
     private long lastRecoilWarningTime = 0;
 
-    public RecoilOverlay(ItemManager itemManager, PvPWarningConfig config, Client client)
-    {
+    public RecoilOverlay(ItemManager itemManager, PvPWarningConfig config, Client client) {
         this.itemManager = itemManager;
         this.config = config;
         this.client = client;
@@ -36,40 +36,30 @@ public class RecoilOverlay extends Overlay
         setLayer(OverlayLayer.ABOVE_WIDGETS);
     }
 
-    private void loadRingImage()
-    {
-        if (ringImage == null)
-        {
+    private void loadRingImage() {
+        if (ringImage == null) {
             ringImage = itemManager.getImage(ringOfRecoilId);
         }
     }
 
-    private boolean isRingEquipped()
-    {
-        if (client.getItemContainer(InventoryID.EQUIPMENT) == null)
-        {
+    private boolean isRingEquipped() {
+        if (client.getItemContainer(InventoryID.EQUIPMENT) == null) {
             return false;
         }
-        for (Item item : client.getItemContainer(InventoryID.EQUIPMENT).getItems())
-        {
-            if (item != null && item.getId() == ringOfRecoilId)
-            {
+        for (Item item : client.getItemContainer(InventoryID.EQUIPMENT).getItems()) {
+            if (item != null && item.getId() == ringOfRecoilId) {
                 return true;
             }
         }
         return false;
     }
 
-    private boolean isRingInInventory()
-    {
-        if (client.getItemContainer(InventoryID.INVENTORY) == null)
-        {
+    private boolean isRingInInventory() {
+        if (client.getItemContainer(InventoryID.INVENTORY) == null) {
             return false;
         }
-        for (Item item : client.getItemContainer(InventoryID.INVENTORY).getItems())
-        {
-            if (item != null && item.getId() == ringOfRecoilId)
-            {
+        for (Item item : client.getItemContainer(InventoryID.INVENTORY).getItems()) {
+            if (item != null && item.getId() == ringOfRecoilId) {
                 return true;
             }
         }
@@ -77,43 +67,34 @@ public class RecoilOverlay extends Overlay
     }
 
     @Override
-    public Dimension render(Graphics2D graphics)
-    {
-        // Display overlay only if "No Recoil Overlay" is enabled.
-        if (!config.noRecoilOverlay())
-        {
+    public Dimension render(Graphics2D graphics) {
+        if (!config.noRecoilOverlay()) {
             return null;
         }
-        // Only show overlay if the ring is present in inventory but not equipped.
-        if (isRingEquipped() || !isRingInInventory())
-        {
+        if (isRingEquipped() || !isRingInInventory()) {
             return null;
         }
-        // If "Only Enable in PvP" is enabled, show only in unsafe PvP areas.
         if (config.onlyActiveInPvP()) {
             Set<WorldType> worldTypes = client.getWorldType();
             if (!worldTypes.contains(WorldType.PVP) || client.getVar(29) <= 0 || client.getVar(Varbits.PVP_SPEC_ORB) == 0) {
                 return null;
             }
         }
-        // New: Warning No Recoil chat message if enabled.
         if (config.warningNoRecoil()) {
             long currentTime = System.currentTimeMillis();
             int delayTicks = config.warningNoRecoilDelay();
             long delayMillis = delayTicks * 600L;
             if (currentTime - lastRecoilWarningTime >= delayMillis) {
-                // Use recoil warning chat color from config.
                 Color chatColor = config.recoilWarningChatColor();
                 String hexColor = String.format("%06X", (0xFFFFFF & chatColor.getRGB()));
                 client.addChatMessage(net.runelite.api.ChatMessageType.GAMEMESSAGE, "System", "<col=" + hexColor + "><u>WARNING!</u> No Ring of Recoil equipped!", null);
                 lastRecoilWarningTime = currentTime;
             }
         }
-        // Blink logic: if Blink Recoil Overlay is enabled, use system time to toggle display.
         boolean blinkOff = false;
         if (config.blinkRecoilOverlay()) {
             long time = System.currentTimeMillis();
-            blinkOff = ((time % 1000) >= 500);
+            blinkOff = (time % 1000) >= 500;
         }
         loadRingImage();
         if (ringImage == null) {
@@ -122,7 +103,6 @@ public class RecoilOverlay extends Overlay
         if (!blinkOff) {
             graphics.drawImage(ringImage, 0, 0, null);
         }
-        // Always return the same dimension to keep overlay position constant.
         return new Dimension(ringImage.getWidth(), ringImage.getHeight());
     }
 }

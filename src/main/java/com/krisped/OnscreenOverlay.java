@@ -28,17 +28,16 @@ public class OnscreenOverlay extends OverlayPanel {
     }
 
     public void updateRisk() {
-        risk = PriceManager.computeRisk(client, itemManager, config);
+        risk = PriceManager.computeRisk(client, itemManager, config.onscreenPriceSource(), config);
     }
 
     @Override
     public Dimension render(Graphics2D graphics) {
-        // Global toggle and onscreen risk overlay toggle
-        if (!config.enableRiskOverlay() || !config.showRiskOverlay()) {
+        // Bruk kun onscreen-toggle
+        if (!config.showRiskOverlayOnscreen()) {
             return null;
         }
-        // Only enable in PvP: check if we're in a PvP world and in wilderness (varbit 29 > 0)
-        if (config.onlyEnableInPvP()) {
+        if (config.onscreenOnlyEnableInPvP()) {
             Set<WorldType> worldTypes = client.getWorldType();
             if (!worldTypes.contains(WorldType.PVP) || client.getVar(29) <= 0) {
                 return null;
@@ -46,18 +45,13 @@ public class OnscreenOverlay extends OverlayPanel {
         }
         updateRisk();
         String fullText = "Risk: " + NumberFormat.getInstance().format(risk) + " GP";
-
-        // Blink only if enableBlink is active, risk exceeds threshold, and enableRiskColor is active.
-        boolean blink = config.enableBlink() && config.enableRiskColor() && (risk >= config.warningRiskOver());
+        boolean blink = config.onscreenEnableBlink() && config.onscreenEnableRiskColor() && (risk >= config.onscreenWarningRiskOver());
         long time = System.currentTimeMillis();
         String displayText = (blink && (time % 1000 >= 500)) ? "" : fullText;
-
-        // Set text color: if enableRiskColor is active and risk >= threshold, use riskColor; otherwise, use mainColor.
-        Color textColor = config.mainColor();
-        if (config.enableRiskColor() && risk >= config.warningRiskOver()) {
-            textColor = config.riskColor();
+        Color textColor = config.onscreenMainColor();
+        if (config.onscreenEnableRiskColor() && risk >= config.onscreenWarningRiskOver()) {
+            textColor = config.onscreenRiskColor();
         }
-
         panelComponent.getChildren().clear();
         panelComponent.getChildren().add(
                 TitleComponent.builder()
@@ -65,7 +59,6 @@ public class OnscreenOverlay extends OverlayPanel {
                         .color(textColor)
                         .build()
         );
-        // Preserve overlay dimensions using fullText width.
         panelComponent.setPreferredSize(new Dimension(
                 graphics.getFontMetrics().stringWidth(fullText) + 20,
                 graphics.getFontMetrics().getHeight() + 10

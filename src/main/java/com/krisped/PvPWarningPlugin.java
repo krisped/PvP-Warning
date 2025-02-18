@@ -65,7 +65,7 @@ public class PvPWarningPlugin extends Plugin {
     }
 
     @Subscribe
-    public void onGameTick(GameTick event) {
+    public void onGameTick(net.runelite.api.events.GameTick event) {
         if (onscreenOverlay != null) {
             onscreenOverlay.updateRisk();
         }

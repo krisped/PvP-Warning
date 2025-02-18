@@ -31,16 +31,18 @@ public class InventoryOverlay extends Overlay {
     }
 
     public void updateRisk() {
-        risk = PriceManager.computeRisk(client, itemManager, config);
+        // Bruker inventoryPriceSource for riskberegning
+        risk = PriceManager.computeRisk(client, itemManager, config.inventoryPriceSource(), config);
     }
 
     @Override
     public Dimension render(Graphics2D graphics) {
-        if (!config.enableRiskOverlay() || !config.showInventoryRiskOverlay()) {
+        // Sjekk om inventory-overlay skal vises
+        if (!config.showRiskOverlayInventory()) {
             return null;
         }
-        // Hvis Only Enable in PvP er aktiv, sjekk at vi er i en PvP-verden og med wilderness > 0
-        if (config.onlyEnableInPvP()) {
+        // Hvis "Only Enable in PvP" er aktiv, sjekk at vi er i en PvP-verden med wilderness > 0
+        if (config.inventoryOnlyEnableInPvP()) {
             Set<WorldType> worldTypes = client.getWorldType();
             if (!worldTypes.contains(WorldType.PVP) || client.getVar(29) <= 0) {
                 return null;
@@ -54,20 +56,20 @@ public class InventoryOverlay extends Overlay {
         Rectangle bounds = inventoryWidget.getBounds();
         String fullText = "Risk: " + NumberFormat.getInstance().format(risk) + " GP";
 
-        // Blink logikk: fjern teksten i 0.5 sec hvis enableBlink er aktiv, risk overstiger terskel og risk color er aktiv.
-        boolean blink = config.enableBlink() && config.enableRiskColor() && (risk >= config.warningRiskOver());
+        // Blink logikk: hvis enableBlink er aktiv, risiko overstiger terskel og enableRiskColor er aktiv, fjern teksten 0.5 sek.
+        boolean blink = config.inventoryEnableBlink() && config.inventoryEnableRiskColor() && (risk >= config.inventoryWarningRiskOver());
         long time = System.currentTimeMillis();
         String displayText = (blink && (time % 1000 >= 500)) ? "" : fullText;
 
-        // Sett tekstfarge: hvis enableRiskColor er aktiv og risk >= terskel, bruk riskColor; ellers bruk mainColor.
-        Color textColor = config.mainColor();
-        if (config.enableRiskColor() && risk >= config.warningRiskOver()) {
-            textColor = config.riskColor();
+        // Sett farge: bruk inventoryMainColor dersom ingen advarsel, ellers inventoryRiskColor.
+        Color textColor = config.inventoryMainColor();
+        if (config.inventoryEnableRiskColor() && risk >= config.inventoryWarningRiskOver()) {
+            textColor = config.inventoryRiskColor();
         }
 
-        // Hent font basert på inventoryOverlayFont og inventoryOverlayFontSize fra config.
+        // Velg font basert på inventoryFont dropdown
         Font baseFont;
-        switch(config.inventoryOverlayFont()) {
+        switch (config.inventoryFont()) {
             case ARIAL:
                 baseFont = new Font("Arial", Font.PLAIN, 12);
                 break;
@@ -100,13 +102,15 @@ public class InventoryOverlay extends Overlay {
                 baseFont = FontManager.getRunescapeFont();
                 break;
         }
+
+        // Konverter inventoryFontSize robust
         float fontSize;
         try {
-            fontSize = config.inventoryOverlayFontSize();
-        } catch (ClassCastException ex) {
+            fontSize = config.inventoryFontSize();
+        } catch (ClassCastException e) {
             try {
-                fontSize = Float.parseFloat((String) (Object) config.inventoryOverlayFontSize());
-            } catch (Exception e) {
+                fontSize = Float.parseFloat(String.valueOf(config.inventoryFontSize()));
+            } catch (Exception ex) {
                 fontSize = 15f;
             }
         }
@@ -117,8 +121,8 @@ public class InventoryOverlay extends Overlay {
         int x = bounds.x + (bounds.width - textWidth) / 2;
         int yTop = bounds.y + graphics.getFontMetrics().getAscent();
         int yBottom = bounds.y + bounds.height;
-        int offset = 3;
-        int y = config.inventoryOverlayPosition() == PvPWarningConfig.InventoryOverlayPosition.TOP ? yTop - offset : yBottom + offset;
+        int offset = config.inventoryTextOffset();  // justert med slider -5 til +5
+        int y = config.inventoryTextPos() == PvPWarningConfig.InventoryOverlayPosition.TOP ? yTop - offset : yBottom + offset;
         graphics.drawString(displayText, x, y);
         return new Dimension(textWidth, graphics.getFontMetrics().getHeight());
     }

@@ -1,6 +1,7 @@
 package com.krisped;
 
 import com.google.gson.Gson;
+import com.krisped.PvPWarningConfig.PriceSource;
 import net.runelite.api.Client;
 import net.runelite.api.Item;
 import net.runelite.api.InventoryID;
@@ -40,13 +41,13 @@ public class PriceManager {
     private static Map<Integer, Long> osrsWikiPrices;
     private static long osrsWikiPricesLastFetch = 0;
 
-    // Get the price for an item based on the configuration
-    public static long getPriceForItem(int itemId, ItemManager itemManager, PvPWarningConfig config) {
+    // Get the price for an item based on the passed PriceSource parameter.
+    public static long getPriceForItem(int itemId, ItemManager itemManager, PriceSource priceSource) {
         if (MANUAL_PRICES.containsKey(itemId))
             return MANUAL_PRICES.get(itemId);
-        if (config.priceSource() == PvPWarningConfig.PriceSource.RUNELITE)
+        if (priceSource == PriceSource.RUNELITE)
             return itemManager.getItemPrice(itemId);
-        else if (config.priceSource() == PvPWarningConfig.PriceSource.OSRS_WIKI)
+        else if (priceSource == PriceSource.OSRS_WIKI)
             return getOsrsWikiPrice(itemId);
         return 0L;
     }
@@ -105,34 +106,36 @@ public class PriceManager {
         long low;
     }
 
-    // Compute total risk based on items, PvP skull, and Protect Item adjustments.
-    public static int computeRisk(Client client, ItemManager itemManager, PvPWarningConfig config) {
+    // Compute total risk based on items, PvP skull, and Protect Item adjustments,
+    // using the specified PriceSource.
+    public static int computeRisk(Client client, ItemManager itemManager, PriceSource priceSource, PvPWarningConfig config) {
         int total = 0;
-        List<Item> allItems = new ArrayList<>();
+        java.util.List<Item> allItems = new java.util.ArrayList<>();
         if (client.getItemContainer(InventoryID.INVENTORY) != null) {
-            allItems.addAll(Arrays.asList(client.getItemContainer(InventoryID.INVENTORY).getItems()));
+            allItems.addAll(java.util.Arrays.asList(client.getItemContainer(InventoryID.INVENTORY).getItems()));
         }
         if (client.getItemContainer(InventoryID.EQUIPMENT) != null) {
-            allItems.addAll(Arrays.asList(client.getItemContainer(InventoryID.EQUIPMENT).getItems()));
+            allItems.addAll(java.util.Arrays.asList(client.getItemContainer(InventoryID.EQUIPMENT).getItems()));
         }
         for (Item item : allItems) {
             if (item != null && item.getId() != -1) {
-                long price = getPriceForItem(item.getId(), itemManager, config);
+                long price = getPriceForItem(item.getId(), itemManager, priceSource);
                 total += price * item.getQuantity();
             }
         }
 
-        // Adjustment based on PvP skull and Protect Item
-        if (config.riskBasedOnPvPSkull()) {
+        // Adjustment based on PvP skull and Protect Item.
+        // Bruk onscreenRiskBasedOnPvPSkull() som global risikoberegning.
+        if (config.onscreenRiskBasedOnPvPSkull()) {
             boolean skulled = client.getLocalPlayer().getSkullIcon() != -1;
             if (!skulled) {
                 int numToSubtract = 3;
-                if (config.protectItem() && isProtectItemPrayerActive(client))
+                if (config.onscreenProtectItem() && isProtectItemPrayerActive(client))
                     numToSubtract = 4;
-                List<Long> pricesList = new ArrayList<>();
+                java.util.List<Long> pricesList = new java.util.ArrayList<>();
                 for (Item item : allItems) {
                     if (item != null && item.getId() != -1)
-                        pricesList.add(getPriceForItem(item.getId(), itemManager, config));
+                        pricesList.add(getPriceForItem(item.getId(), itemManager, priceSource));
                 }
                 pricesList.sort((a, b) -> Long.compare(b, a));
                 long subtractSum = 0;
@@ -143,11 +146,11 @@ public class PriceManager {
                 if (total < 0)
                     total = 0;
             } else {
-                if (config.protectItem() && isProtectItemPrayerActive(client)) {
+                if (config.onscreenProtectItem() && isProtectItemPrayerActive(client)) {
                     long maxPrice = 0;
                     for (Item item : allItems) {
                         if (item != null && item.getId() != -1) {
-                            long price = getPriceForItem(item.getId(), itemManager, config);
+                            long price = getPriceForItem(item.getId(), itemManager, priceSource);
                             if (price > maxPrice)
                                 maxPrice = price;
                         }
@@ -158,11 +161,11 @@ public class PriceManager {
                 }
             }
         } else {
-            if (config.protectItem() && isProtectItemPrayerActive(client)) {
+            if (config.onscreenProtectItem() && isProtectItemPrayerActive(client)) {
                 long maxPrice = 0;
                 for (Item item : allItems) {
                     if (item != null && item.getId() != -1) {
-                        long price = getPriceForItem(item.getId(), itemManager, config);
+                        long price = getPriceForItem(item.getId(), itemManager, priceSource);
                         if (price > maxPrice)
                             maxPrice = price;
                     }
